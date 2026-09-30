@@ -1,0 +1,14 @@
+{
+  "name": "de-dupe",
+  "version": "0.1.0",
+  "description": "Layered deduplication: exact hash, order-preserving containment, 3-way-merge mergeability, and zero-dependency semantic similarity clustering -- pluggable over any source (plain files, git branches, or a custom adapter).",
+  "type": "module",
+  "bin": {
+    "dedupe": "./src/cli.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
