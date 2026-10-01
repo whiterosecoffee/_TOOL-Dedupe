@@ -12,7 +12,7 @@ Every layer that discards something keeps a pointer to what it discarded and rec
 - **Containment** keeps both ids too (`subset`/`superset`), plus `extra`: the exact lines the superset carries beyond the subset. The claim "nothing is lost by keeping only the superset" isn't asserted, it's shown.
 - **Similarity clusters** don't discard anything at all — grouping isn't deletion — and each cluster now carries its own internal pairwise scores, not just an opaque bag of ids.
 
-That's necessary but not sufficient — a pipeline can compute a wrong verdict and still present it with total confidence. So there's a fourth, independent layer that doesn't trust any of the above: **`dedupe audit`** re-reads every file named in a report straight from disk and re-derives each exact-duplicate and containment claim from scratch, with its own code path, not the pipeline's in-memory state. Run it after every real run; see **Measured results** below for a real pass.
+That's necessary but not sufficient — a pipeline can compute a wrong verdict and still present it with total confidence. So there's a fourth, independent layer that doesn't trust any of the above: **`dedupe audit`** re-reads every file named in a report straight from disk and re-derives each exact-duplicate and containment claim from scratch, with genuinely separate code (direct content comparison, an LCS-based containment proof, its own normalizer; a test enforces it imports nothing from the other core modules). It also checks completeness: any identical files the report failed to group are flagged as `missed_exact_duplicate`. Run it after every real run; see **Measured results** below for a real pass.
 
 ## The five computation layers
 
@@ -40,11 +40,11 @@ Adding a new source is writing a new adapter that produces `{id: string, content
 ## Usage
 
 ```bash
-npm test                                                             # 19 tests: all core layers, audit, end-to-end
+npm test                                                             # 27 tests: all core layers, audit, end-to-end, Phase 1 guards
 
 node src/cli.mjs scan --dir <path> [--ignore-dirs a,b]                                        # free dry run, always do this first
 node src/cli.mjs git --repo <path> --base <ref> [--remote origin] [--exclude a,b] [--out report.json]
-node src/cli.mjs files --dir <path> [--threshold 0.65] [--ignore-dirs a,b] [--no-gitignore] [--max-files <n>|false] [--out report.json]
+node src/cli.mjs files --dir <path> [--threshold 0.65] [--ignore-dirs a,b] [--no-gitignore] [--max-files <n>|false] [--normalize] [--min-subset-lines <n>] [--max-size-ratio <n>] [--out report.json]
 node src/cli.mjs audit --report <path> --dir <path>                                           # independent re-verification, always do this after
 ```
 

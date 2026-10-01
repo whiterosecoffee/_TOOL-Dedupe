@@ -12,7 +12,7 @@ test("audit passes on a genuine report, straight from fresh disk reads", () => {
     writeFileSync(join(dir, "a.md"), "same content\n");
     writeFileSync(join(dir, "b.md"), "same content\n");
     writeFileSync(join(dir, "c.md"), "header\nsame content\nfooter\n");
-    const report = runFilesDedupe({ dir });
+    const report = runFilesDedupe({ dir, minSubsetLines: 1 });
     const result = auditZeroLoss(report, dir);
     assert.equal(result.pass, true);
     assert.ok(result.checked >= 2); // 1 exact-dup group + 1 containment pair

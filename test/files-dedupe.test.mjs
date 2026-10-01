@@ -24,7 +24,7 @@ test("end-to-end: exact dup, containment, and similarity cluster all detected in
     );
     writeFileSync(join(dir, "unrelated.md"), "quarterly financial results exceeded analyst expectations\n");
 
-    const report = runFilesDedupe({ dir, similarityThreshold: 0.5 });
+    const report = runFilesDedupe({ dir, similarityThreshold: 0.5, minSubsetLines: 1 });
 
     assert.equal(report.totalFiles, 6);
     assert.equal(report.exactDuplicateGroups.length, 1);

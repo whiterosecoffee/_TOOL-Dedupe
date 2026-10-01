@@ -24,17 +24,29 @@ export function isSubsequence(a, b) {
 }
 
 /**
+ * @param {string} aText
+ * @param {string} bText
+ * @param {{minSubsetLines?: number, maxSizeRatio?: number}} [opts]
+ *   minSubsetLines: the smaller side must have at least this many non-blank lines to count as a
+ *     subset. Tiny files (a lone `}`) are subsequences of almost anything, which is a false
+ *     positive, not a real containment finding. Default 0 (no floor) at this level; the pipeline
+ *     sets a real default.
+ *   maxSizeRatio: the larger side may have at most this many times the smaller side's non-blank
+ *     lines. Default Infinity.
  * @returns {"identical"|"a_subset_of_b"|"b_subset_of_a"|"neither"}
  */
-export function classifyContainment(aText, bText) {
+export function classifyContainment(aText, bText, opts = {}) {
   if (aText === bText) return "identical";
+  const minSubsetLines = opts.minSubsetLines ?? 0;
+  const maxSizeRatio = opts.maxSizeRatio ?? Infinity;
   const a = lines(aText);
   const b = lines(bText);
-  // Cheap reject: A can't be contained in B if A has more non-empty lines than B.
   const aCount = a.filter(Boolean).length;
   const bCount = b.filter(Boolean).length;
-  if (aCount <= bCount && isSubsequence(a, b)) return "a_subset_of_b";
-  if (bCount <= aCount && isSubsequence(b, a)) return "b_subset_of_a";
+  const eligible = (small, large) => small >= minSubsetLines && large <= small * maxSizeRatio;
+  // Cheap reject: A can't be contained in B if A has more non-empty lines than B.
+  if (aCount <= bCount && eligible(aCount, bCount) && isSubsequence(a, b)) return "a_subset_of_b";
+  if (bCount <= aCount && eligible(bCount, aCount) && isSubsequence(b, a)) return "b_subset_of_a";
   return "neither";
 }
 

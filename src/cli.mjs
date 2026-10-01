@@ -13,7 +13,8 @@ const USAGE = `de-dupe: layered deduplication (exact hash -> order-preserving co
 Usage:
   dedupe scan --dir <path> [--ignore-dirs a,b]
   dedupe git --repo <path> [--base <ref>] [--remote <name>] [--exclude a,b] [--branches a,b] [--out <path>]
-  dedupe files --dir <path> [--threshold <0..1>] [--ignore-dirs a,b] [--no-gitignore] [--max-files <n>|false] [--out <path>]
+  dedupe files --dir <path> [--threshold <0..1>] [--ignore-dirs a,b] [--no-gitignore] [--max-files <n>|false]
+               [--normalize] [--min-subset-lines <n>] [--max-size-ratio <n>] [--out <path>]
   dedupe audit --report <path> --dir <path>
   dedupe passes
   dedupe --help
@@ -32,6 +33,10 @@ files  Walk a plain directory of text files; find exact duplicates, containment 
        Respects the target directory's own .gitignore by default for bare top-level directory
        names (real globs aren't handled -- see src/adapters/files.mjs). Stops at 5000 files by
        default as a safety cap, not a real limit -- override with --max-files.
+
+       --normalize compares after normalizing line endings, BOM and trailing whitespace (opt-in;
+       groups matched only this way are flagged normalizedMatch). --min-subset-lines (default 5)
+       and --max-size-ratio (default 20) stop tiny files being reported as "subsets" of everything.
 
 audit  Independently re-derive every exact-duplicate and containment claim in a files-dedupe
        report straight from disk (fresh reads, not the pipeline's own in-memory state) and
@@ -133,6 +138,9 @@ function main() {
       similarityThreshold: flags.threshold ? Number(flags.threshold) : undefined,
       ignoreDirs: flags["ignore-dirs"] ? new Set(String(flags["ignore-dirs"]).split(",").map((s) => s.trim()).filter(Boolean)) : undefined,
       respectGitignore: flags["no-gitignore"] ? false : undefined,
+      normalize: flags.normalize ? true : undefined,
+      minSubsetLines: flags["min-subset-lines"] ? Number(flags["min-subset-lines"]) : undefined,
+      maxSizeRatio: flags["max-size-ratio"] ? Number(flags["max-size-ratio"]) : undefined,
       maxFiles: flags["max-files"] === "false" ? false : flags["max-files"] ? Number(flags["max-files"]) : undefined,
     };
     const report = runFilesDedupe(opts);
@@ -162,7 +170,8 @@ function main() {
     }
     const report = JSON.parse(readFileSync(String(flags.report), "utf8"));
     const result = auditZeroLoss(report, resolve(String(flags.dir)));
-    console.log(`Independently re-checked ${result.checked} claims (exact-duplicate groups + containment pairs) against fresh disk reads.`);
+    console.log(`Independently re-checked ${result.checked} claims against fresh disk reads, using code independent of the pipeline.`);
+    if (!result.completenessChecked) console.log("Note: report has no file list, so missed-duplicate (completeness) checking was skipped.");
     if (result.pass) {
       console.log("PASS -- zero loss confirmed: every discard the report made is independently verified correct.");
     } else {
