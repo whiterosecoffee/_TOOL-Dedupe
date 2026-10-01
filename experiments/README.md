@@ -1,0 +1,17 @@
+# Experiments: prior-art libraries tested directly, not just researched
+
+Real runs against real data, not vendor claims. See repo README's "Measured results" for de-dupe's own numbers on the same corpus — these experiments test whether a real, external, battle-tested library does better.
+
+## `splink-real-corpus-test.py` — Splink, unsupervised Fellegi-Sunter EM
+
+**Setup:** `pip install splink` (v5.0.0). Loaded the exact same 228-file corpus from `Prompts/` that de-dupe's own README reports results for. No blocking (small corpus, compare all ~26k pairs directly). `cl.JaccardAtThresholds("content", [0.5, 0.9])` — token-level Jaccard similarity on whole-file content, thresholds at 0.5 and 0.9. Unsupervised: `u` from random sampling, `m` from expectation-maximization — genuinely no training labels anywhere, which is the whole reason Splink (not `dedupe`) was chosen for this test; see the main README's "Measured results" / prior-art comparison for why.
+
+**Result: Splink found 1 match total, at 0.54 match probability** (`Precompiler Maturation/payload.json` vs. `payload.stabilize-v0.2.1.json`). Its own training log reported: *"Level Jaccard distance of 'content >= 0.9' on comparison content not observed in dataset, unable to train m value"* — meaning across all ~26,000 real pairs in this corpus, including the near-identical forked session files and templated `Runs/*/prompt.json` pairs de-dupe's own TF-IDF layer scored at 0.998–0.9999 similarity, **not one pair ever reached 0.9 Jaccard on whole-document content.**
+
+**Why, concretely:** Jaccard treats every token equally (set membership, no weighting). TF-IDF cosine (what de-dupe uses) weights rare, distinctive tokens heavily and discounts common ones — that's exactly what separates "two long documents share a lot of generic vocabulary" from "two documents are restatements of each other." On short structured fields (names, addresses — what Splink and `dedupe` were actually built for) that distinction barely matters; on long free text, it's the entire signal. Raw Jaccard on whole documents washes it out.
+
+**Checked whether a fairer comparison existed:** Splink does have `cl.CosineSimilarityAtThresholds`, but its `col_name` argument must already be a numeric vector column (DuckDB's `array_cosine_similarity`) — Splink does not compute embeddings or TF-IDF from raw text itself. Using it would require running a separate embedding step first (e.g. `@huggingface/transformers`, already identified as the real upgrade path for de-dupe's own similarity layer) and feeding the resulting vectors in. Splink's own comparison library has no built-in path from raw long text to a similarity score.
+
+## Verdict
+
+Neither `dedupe` nor `Splink` is usable as a drop-in replacement for de-dupe's similarity layer on this kind of corpus (long free-text/markdown/JSON documents), confirmed empirically, not just by reading documentation: both assume short, structured, field-delimited input (names, dates, codes) and neither computes a meaningful similarity signal from raw long text on its own. The real, reusable takeaway from Splink isn't the library itself — it's the **unsupervised EM decision framework** (match/non-match thresholds calibrated from data, not a hand-picked cutoff) as a model for how de-dupe's own single hardcoded similarity threshold (0.65) should eventually be replaced, once there's a real embedding-based similarity score worth calibrating against.

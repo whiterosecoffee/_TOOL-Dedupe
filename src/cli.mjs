@@ -5,6 +5,7 @@ import { runGitDedupe } from "./pipelines/git-dedupe.mjs";
 import { runFilesDedupe } from "./pipelines/files-dedupe.mjs";
 import { auditZeroLoss } from "./core/audit.mjs";
 import { countRecordsInDirectory } from "./adapters/files.mjs";
+import { PASSES, PLANNED_NEXT_PASS } from "./passes.mjs";
 
 const USAGE = `de-dupe: layered deduplication (exact hash -> order-preserving containment ->
 3-way-merge mergeability -> TF-IDF similarity clustering)
@@ -14,6 +15,7 @@ Usage:
   dedupe git --repo <path> [--base <ref>] [--remote <name>] [--exclude a,b] [--branches a,b] [--out <path>]
   dedupe files --dir <path> [--threshold <0..1>] [--ignore-dirs a,b] [--no-gitignore] [--max-files <n>|false] [--out <path>]
   dedupe audit --report <path> --dir <path>
+  dedupe passes
   dedupe --help
 
 scan   Fast, content-free dry run: count what "files" would walk (file count, bytes, extension
@@ -168,6 +170,21 @@ function main() {
       for (const f of result.failures) console.log("  " + JSON.stringify(f));
       process.exit(1);
     }
+    return;
+  }
+
+  if (command === "passes") {
+    console.log("Passes, cheapest and most certain first (src/passes.mjs is the source of truth -- this just prints it):\n");
+    for (const p of PASSES) {
+      console.log(`[depth ${p.depth}] ${p.label}  (${p.costTier})`);
+      console.log(`  strips: ${p.strips}`);
+      console.log(`  technique: ${p.technique}`);
+      console.log(`  certainty: ${p.certainty}`);
+      console.log(`  measured: ${p.measured}`);
+      console.log(`  in: ${p.implementedIn}\n`);
+    }
+    console.log(`Not yet built -- [depth ${PLANNED_NEXT_PASS.depth}] ${PLANNED_NEXT_PASS.label}`);
+    console.log(`  ${PLANNED_NEXT_PASS.rationale}`);
     return;
   }
 
