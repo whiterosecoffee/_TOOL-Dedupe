@@ -37,3 +37,26 @@ export function classifyContainment(aText, bText) {
   if (bCount <= aCount && isSubsequence(b, a)) return "b_subset_of_a";
   return "neither";
 }
+
+/**
+ * Records what the fuller side (`sub` is a subsequence of `full`) actually has that the
+ * subset doesn't -- greedily aligns sub's lines against full (same matching order isSubsequence
+ * uses) and returns every unmatched line of `full`, with its position. This is the recorded
+ * difference: containment says "no information is lost by keeping only `full`," and this proves
+ * it by naming exactly what `full` carries beyond `sub`, not just asserting the relationship.
+ * @returns {{line: number, text: string}[]}
+ */
+export function extraLines(subText, fullText) {
+  const sub = lines(subText);
+  const full = lines(fullText);
+  const extra = [];
+  let i = 0;
+  for (let j = 0; j < full.length; j++) {
+    if (i < sub.length && sub[i] === full[j]) {
+      i++;
+    } else {
+      extra.push({ line: j, text: full[j] });
+    }
+  }
+  return extra;
+}

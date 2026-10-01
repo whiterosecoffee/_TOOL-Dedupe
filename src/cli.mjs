@@ -1,16 +1,25 @@
 #!/usr/bin/env node
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { runGitDedupe } from "./pipelines/git-dedupe.mjs";
 import { runFilesDedupe } from "./pipelines/files-dedupe.mjs";
+import { auditZeroLoss } from "./core/audit.mjs";
+import { countRecordsInDirectory } from "./adapters/files.mjs";
 
 const USAGE = `de-dupe: layered deduplication (exact hash -> order-preserving containment ->
 3-way-merge mergeability -> TF-IDF similarity clustering)
 
 Usage:
+  dedupe scan --dir <path> [--ignore-dirs a,b]
   dedupe git --repo <path> [--base <ref>] [--remote <name>] [--exclude a,b] [--branches a,b] [--out <path>]
-  dedupe files --dir <path> [--threshold <0..1>] [--out <path>]
+  dedupe files --dir <path> [--threshold <0..1>] [--ignore-dirs a,b] [--no-gitignore] [--max-files <n>|false] [--out <path>]
+  dedupe audit --report <path> --dir <path>
   dedupe --help
+
+scan   Fast, content-free dry run: count what "files" would walk (file count, bytes, extension
+       breakdown, directories being skipped) WITHOUT reading anything. Run this first on any
+       directory you haven't scanned before -- the cheapest possible step in this whole tool is
+       finding out you're about to scan the wrong thing before paying to actually read it.
 
 git    Compare every branch of a git repo against a base ref; verdict each contended file as
        redundant (dedupe), auto_mergeable, or needs_variant. Always pass --base explicitly --
@@ -18,6 +27,14 @@ git    Compare every branch of a git repo against a base ref; verdict each conte
 
 files  Walk a plain directory of text files; find exact duplicates, containment relationships,
        and (TF-IDF-similarity) near-duplicate clusters among what's left. No git required.
+       Respects the target directory's own .gitignore by default for bare top-level directory
+       names (real globs aren't handled -- see src/adapters/files.mjs). Stops at 5000 files by
+       default as a safety cap, not a real limit -- override with --max-files.
+
+audit  Independently re-derive every exact-duplicate and containment claim in a files-dedupe
+       report straight from disk (fresh reads, not the pipeline's own in-memory state) and
+       report any mismatch. Run this before trusting a report's discards; zero loss is only
+       as real as the last time it was actually re-checked.
 `;
 
 function parseFlags(argv) {
@@ -85,6 +102,25 @@ function main() {
     return;
   }
 
+  if (command === "scan") {
+    if (!flags.dir) {
+      console.error("Missing --dir <path>\n\n" + USAGE);
+      process.exit(1);
+    }
+    const dir = resolve(String(flags.dir));
+    const ignoreDirs = flags["ignore-dirs"] ? new Set(String(flags["ignore-dirs"]).split(",").map((s) => s.trim()).filter(Boolean)) : undefined;
+    const t0 = performance.now();
+    const result = countRecordsInDirectory(dir, { ignoreDirs });
+    const ms = Math.round(performance.now() - t0);
+    console.log(`${result.count} files, ${(result.totalBytes / 1024 / 1024).toFixed(2)} MB, scanned in ${ms}ms (no content read).`);
+    console.log("By extension: " + JSON.stringify(result.byExtension));
+    console.log("Directories skipped (default + .gitignore): " + result.ignoredDirs.join(", "));
+    if (result.count > 5000) {
+      console.log(`\nNote: 'files' defaults to a 5000-file safety cap; this directory has ${result.count}. Pass --max-files to proceed, but see README's O(n^2) scaling note first.`);
+    }
+    return;
+  }
+
   if (command === "files") {
     if (!flags.dir) {
       console.error("Missing --dir <path>\n\n" + USAGE);
@@ -93,6 +129,9 @@ function main() {
     const opts = {
       dir: resolve(String(flags.dir)),
       similarityThreshold: flags.threshold ? Number(flags.threshold) : undefined,
+      ignoreDirs: flags["ignore-dirs"] ? new Set(String(flags["ignore-dirs"]).split(",").map((s) => s.trim()).filter(Boolean)) : undefined,
+      respectGitignore: flags["no-gitignore"] ? false : undefined,
+      maxFiles: flags["max-files"] === "false" ? false : flags["max-files"] ? Number(flags["max-files"]) : undefined,
     };
     const report = runFilesDedupe(opts);
     console.log(`Scanned ${report.totalFiles} files.`);
@@ -103,9 +142,32 @@ function main() {
         `${report.afterContainment} files remain after removing exact and contained duplicates.`
     );
     console.log(`${report.similarityClusters.length} similarity clusters found among those (threshold ${opts.similarityThreshold ?? 0.65}).`);
+    console.log(
+      `\nTiming: load ${report.timings.load_ms}ms, exact-hash ${report.timings.exact_hash_ms}ms, ` +
+        `containment ${report.timings.containment_ms}ms, similarity+cluster ${report.timings.similarity_cluster_ms}ms, total ${report.timings.total_ms}ms`
+    );
+    console.log("Funnel: " + report.funnel.map((f) => `${f.stage}(${f.records_in ?? "-"}->${f.records_out})`).join(" -> "));
     const outPath = flags.out ? String(flags.out) : "dedupe-files-report.json";
     writeFileSync(outPath, JSON.stringify(report, null, 2) + "\n");
     console.log(`\nFull report: ${outPath}`);
+    return;
+  }
+
+  if (command === "audit") {
+    if (!flags.report || !flags.dir) {
+      console.error("Missing --report <path> and/or --dir <path>\n\n" + USAGE);
+      process.exit(1);
+    }
+    const report = JSON.parse(readFileSync(String(flags.report), "utf8"));
+    const result = auditZeroLoss(report, resolve(String(flags.dir)));
+    console.log(`Independently re-checked ${result.checked} claims (exact-duplicate groups + containment pairs) against fresh disk reads.`);
+    if (result.pass) {
+      console.log("PASS -- zero loss confirmed: every discard the report made is independently verified correct.");
+    } else {
+      console.log(`FAIL -- ${result.failures.length} claim(s) did not re-verify:`);
+      for (const f of result.failures) console.log("  " + JSON.stringify(f));
+      process.exit(1);
+    }
     return;
   }
 

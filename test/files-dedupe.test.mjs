@@ -34,8 +34,15 @@ test("end-to-end: exact dup, containment, and similarity cluster all detected in
     // isn't guaranteed) -- assert the relationship, not which of the two duplicate ids it is.
     assert.ok(["original.md", "exact-copy.md"].includes(report.containmentPairs[0].subset));
     assert.equal(report.containmentPairs[0].superset, "superset.md");
+    // The recorded difference: superset.md's extra lines beyond the subset's content.
+    assert.deepEqual(
+      report.containmentPairs[0].extra.map((l) => l.text),
+      ["header", "footer"]
+    );
     assert.equal(report.similarityClusters.length, 1);
-    assert.deepEqual(new Set(report.similarityClusters[0]), new Set(["paraphrase.md", "paraphrase2.md"]));
+    assert.deepEqual(new Set(report.similarityClusters[0].ids), new Set(["paraphrase.md", "paraphrase2.md"]));
+    assert.equal(report.similarityClusters[0].pairwiseScores.length, 1);
+    assert.ok(report.similarityClusters[0].pairwiseScores[0].score > 0.5);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -3,7 +3,7 @@
 // one repo, need to know what's genuine disagreement (preserve as a variant) vs. everything else
 // (dedupe or merge automatically, never touched by hand).
 import { scanGitBranches, readBlob, pairMergeBase } from "../adapters/git-branches.mjs";
-import { classifyContainment } from "../core/containment.mjs";
+import { classifyContainment, extraLines } from "../core/containment.mjs";
 import { tryAutoMerge } from "../core/merge3.mjs";
 
 function classifyFile(repoRoot, path, entries, baseRef) {
@@ -43,11 +43,14 @@ function classifyFile(repoRoot, path, entries, baseRef) {
         continue;
       }
       if (containment === "a_subset_of_b") {
-        pairwise.push({ a: A.branch, b: B.branch, verdict: "a_subset_of_b", fuller: B.branch });
+        // Recorded difference, not just the relationship: exactly what B's branch has that A's
+        // doesn't. A's content isn't discarded from the record -- both branch names stay
+        // pointed-to in `pairwise` -- only its extra-vs-B delta is what gets named here (empty).
+        pairwise.push({ a: A.branch, b: B.branch, verdict: "a_subset_of_b", fuller: B.branch, extra: extraLines(aText, bText) });
         continue;
       }
       if (containment === "b_subset_of_a") {
-        pairwise.push({ a: A.branch, b: B.branch, verdict: "b_subset_of_a", fuller: A.branch });
+        pairwise.push({ a: A.branch, b: B.branch, verdict: "b_subset_of_a", fuller: A.branch, extra: extraLines(bText, aText) });
         continue;
       }
 
