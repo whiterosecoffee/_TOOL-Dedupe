@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateCorpus, writeCorpus } from "./gen-corpus.mjs";
 import { score, merge } from "./eval.mjs";
-import { toolV0, toolShingle, toolBlock } from "./tools.mjs";
+import { toolV0, toolShingle, toolBlock, toolMulti } from "./tools.mjs";
+import { STRATEGIES } from "./segment.mjs";
 
 const seeds = Number(process.argv[2] ?? 5);
 const families = Number(process.argv[3] ?? 8);
@@ -13,7 +14,10 @@ const TOOLS = {
   "v0 (old, as shipped)": (d) => toolV0(d),
   "v0 + --normalize": (d) => toolV0(d, { normalize: true }),
   "similarity-decides (ablation)": (d) => toolShingle(d),
-  "block-level + exact verify": (d) => toolBlock(d),
+  "block: paragraphs (blank lines)": (d) => toolBlock(d, { segment: STRATEGIES.paragraph, minWords: 60 }),
+  "block: paragraphs + line fallback": (d) => toolBlock(d, { segment: STRATEGIES.paragraphWithLineFallback, minWords: 60 }),
+  "block: sentences (layout-invariant)": (d) => toolBlock(d, { segment: STRATEGIES.sentence, minWords: 60 }),
+  "multi-segmentation (any-verify, 2-agree review)": (d) => toolMulti(d, { segments: Object.values(STRATEGIES) }),
 };
 
 const totals = {};

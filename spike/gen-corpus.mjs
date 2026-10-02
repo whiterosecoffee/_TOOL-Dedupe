@@ -30,6 +30,11 @@ export function generateCorpus(seed, { families = 8 } = {}) {
   };
   const word = () => Array.from({ length: int(2, 3) }, () => pick(SYL)).join("");
   const paragraph = (topic) => {
+    if (rand() < 0.25) {
+      // List-style paragraph: items with NO terminal punctuation (headings/bullets look like this).
+      const items = Array.from({ length: int(3, 5) }, () => "- " + Array.from({ length: int(6, 10) }, () => (rand() < 0.7 ? pick(topic) : pick(COMMON))).join(" "));
+      return items.join("\n");
+    }
     const sentences = Array.from({ length: int(3, 5) }, () => {
       const words = Array.from({ length: int(8, 14) }, () => (rand() < 0.7 ? pick(topic) : pick(COMMON)));
       return words.join(" ") + ".";
@@ -57,7 +62,7 @@ export function generateCorpus(seed, { families = 8 } = {}) {
   const F = newAtom("End of document. Contact the maintainers with any corrections.", null, true);
 
   const docs = []; // {id, atoms:[atomId], render}
-  const OPS = ["copy", "crlf", "rewrap", "tight", "superset", "shrunk", "reorder", "additive", "conflict"];
+  const OPS = ["copy", "crlf", "rewrap", "tight", "wraptight", "sparse", "superset", "shrunk", "reorder", "additive", "conflict"];
   for (let f = 0; f < families; f++) {
     const topic = Array.from({ length: 80 }, word);
     const withBoiler = rand() < 0.5;
@@ -72,6 +77,8 @@ export function generateCorpus(seed, { families = 8 } = {}) {
       if (op === "crlf") render = "crlf";
       else if (op === "rewrap") render = "rewrap";
       else if (op === "tight") render = "tight"; // paragraphs separated by ONE newline, no blank line
+      else if (op === "wraptight") render = "wraptight"; // hard-wrapped AND single-newline: paragraph boundaries invisible
+      else if (op === "sparse") render = "sparse"; // a blank line between every sentence
       else if (op === "superset" || op === "additive") {
         for (let i = 0; i < int(2, 4); i++) list.splice(int(0, list.length), 0, newAtom(paragraph(topic)));
       } else if (op === "shrunk") {
@@ -108,6 +115,8 @@ function wrap(text, width = 72) {
 
 function renderDoc(d, atoms, rand) {
   const paras = d.atoms.map((id) => atoms.get(id).text);
+  if (d.render === "wraptight") return paras.map((p) => wrap(p)).join("\n") + "\n";
+  if (d.render === "sparse") return paras.map((p) => p.split(". ").join(".\n\n")).join("\n\n") + "\n";
   if (d.render === "tight") return paras.join("\n") + "\n";
   if (d.render === "rewrap") return paras.map((p) => wrap(p)).join("\n\n") + "\n";
   const body = paras.map((p) => (d.render === "crlf" && rand() < 0.4 ? p + "  " : p)).join("\n\n") + "\n";

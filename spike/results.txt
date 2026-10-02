@@ -1,47 +1,77 @@
-Seeds: 5, families/seed: 8, documents: 310, labelled pairs: 9474
-Truth mix: identical=262, reorder=115, subset=385, conflict=163, unrelated=8122, trivial=352, additive=75
+Seeds: 5, families/seed: 8, documents: 307, labelled pairs: 9294
+Truth mix: conflict=186, subset=334, identical=306, unrelated=8020, trivial=295, reorder=97, additive=56
 
 | tool | unsafe merges | safe-collapse recall | conflicts etc. surfaced | hidden by collapse | review band | false review | typed triage | comparisons |
 |---|---|---|---|---|---|---|---|---|
-| v0 (old, as shipped) | 0 | 46% (300/647) | 55% (195/353) | 0 | 322 | 5 | untyped | 9474 |
-| v0 + --normalize | 0 | 70% (456/647) | 43% (152/353) | 0 | 204 | 5 | untyped | 9474 |
-| similarity-decides (ablation) | 329 | 100% (645/647) | 59% (210/353) | 143 | 211 | 0 | untyped | 9474 |
-| block-level + exact verify | 0 | 76% (490/647) | 89% (315/353) | 0 | 328 | 13 | 100% | 3620 |
+| v0 (old, as shipped) | 0 | 35% (221/640) | 61% (207/339) | 0 | 375 | 5 | untyped | 9294 |
+| v0 + --normalize | 0 | 48% (306/640) | 53% (180/339) | 0 | 287 | 5 | untyped | 9294 |
+| similarity-decides (ablation) | 324 | 99% (633/640) | 51% (172/339) | 167 | 176 | 0 | untyped | 9294 |
+| block: paragraphs (blank lines) | 0 | 49% (314/640) | 77% (260/339) | 0 | 293 | 10 | 97% | 2192 |
+| block: paragraphs + line fallback | 0 | 47% (303/640) | 85% (287/339) | 0 | 409 | 10 | 91% | 2960 |
+| block: sentences (layout-invariant) | 0 | 60% (384/640) | 100% (339/339) | 0 | 659 | 64 | 62% | 3271 |
+| multi-segmentation (any-verify, 2-agree review) | 0 | 85% (547/640) | 85% (287/339) | 0 | 329 | 10 | 90% | 3278 |
 
 Verdict by true relationship (collapse / review / separate):
 
 v0 (old, as shipped)
-  identical  77 / 30 / 155
-  reorder    0 / 51 / 64
-  subset     223 / 92 / 70
-  conflict   0 / 90 / 73
-  unrelated  0 / 0 / 8122
-  trivial    0 / 5 / 347
-  additive   0 / 54 / 21
+  conflict   0 / 112 / 74
+  subset     161 / 100 / 73
+  identical  60 / 63 / 183
+  unrelated  0 / 0 / 8020
+  trivial    0 / 5 / 290
+  reorder    0 / 49 / 48
+  additive   0 / 46 / 10
 
 v0 + --normalize
-  identical  160 / 3 / 99
-  reorder    0 / 26 / 89
-  subset     296 / 44 / 45
-  conflict   0 / 72 / 91
-  unrelated  0 / 0 / 8122
-  trivial    0 / 5 / 347
-  additive   0 / 54 / 21
+  conflict   0 / 95 / 91
+  subset     203 / 69 / 62
+  identical  103 / 33 / 170
+  unrelated  0 / 0 / 8020
+  trivial    0 / 5 / 290
+  reorder    0 / 39 / 58
+  additive   0 / 46 / 10
 
 similarity-decides (ablation)
-  identical  262 / 0 / 0
-  reorder    0 / 115 / 0
-  subset     383 / 1 / 1
-  conflict   143 / 20 / 0
-  unrelated  0 / 0 / 8122
-  trivial    186 / 0 / 166
-  additive   0 / 75 / 0
+  conflict   167 / 19 / 0
+  subset     327 / 4 / 3
+  identical  306 / 0 / 0
+  unrelated  0 / 0 / 8020
+  trivial    157 / 0 / 138
+  reorder    0 / 97 / 0
+  additive   0 / 56 / 0
 
-block-level + exact verify
-  identical  165 / 0 / 97
-  reorder    0 / 95 / 20
-  subset     325 / 0 / 60
-  conflict   0 / 145 / 18
-  unrelated  0 / 13 / 8109
-  trivial    0 / 0 / 352
-  additive   0 / 75 / 0
+block: paragraphs (blank lines)
+  conflict   0 / 144 / 42
+  subset     213 / 7 / 114
+  identical  101 / 16 / 189
+  unrelated  0 / 10 / 8010
+  trivial    0 / 0 / 295
+  reorder    0 / 60 / 37
+  additive   0 / 56 / 0
+
+block: paragraphs + line fallback
+  conflict   0 / 158 / 28
+  subset     213 / 43 / 78
+  identical  90 / 69 / 147
+  unrelated  0 / 10 / 8010
+  trivial    0 / 0 / 295
+  reorder    0 / 73 / 24
+  additive   0 / 56 / 0
+
+block: sentences (layout-invariant)
+  conflict   0 / 186 / 0
+  subset     78 / 256 / 0
+  identical  306 / 0 / 0
+  unrelated  0 / 9 / 8011
+  trivial    0 / 55 / 240
+  reorder    0 / 97 / 0
+  additive   0 / 56 / 0
+
+multi-segmentation (any-verify, 2-agree review)
+  conflict   0 / 158 / 28
+  subset     241 / 32 / 61
+  identical  306 / 0 / 0
+  unrelated  0 / 10 / 8010
+  trivial    0 / 0 / 295
+  reorder    0 / 73 / 24
+  additive   0 / 56 / 0

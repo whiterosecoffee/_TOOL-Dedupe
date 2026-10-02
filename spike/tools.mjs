@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { runFilesDedupe } from "../src/pipelines/files-dedupe.mjs";
 import { pairKey } from "./gen-corpus.mjs";
+import { paragraph } from "./segment.mjs";
 
 function readAll(dir) {
   return readdirSync(dir).sort().map((id) => ({ id, text: readFileSync(join(dir, id), "utf8") }));
@@ -68,10 +69,6 @@ export function toolShingle(dir, { collapseAt = 0.95, reviewAt = 0.5 } = {}) {
 }
 
 // ---- New path: paragraph blocks, exact ordered verification, typed triage. ----
-function blocksOf(text) {
-  const t = text.replace(/^﻿/, "").replace(/\r\n?/g, "\n");
-  return t.split(/\n[ \t]*\n/).map((b) => b.replace(/\s+/g, " ").trim()).filter(Boolean);
-}
 function lcsLen(a, b) {
   let prev = new Array(b.length + 1).fill(0);
   for (let i = 1; i <= a.length; i++) {
@@ -90,29 +87,32 @@ function tokenJaccard(a, b) {
   return i / (sa.size + sb.size - i);
 }
 
-export function classifyBlocks(A, B, { minBlocks = 3, nearBlock = 0.8, relatedFraction = 0.3 } = {}) {
+// minBlocks and minWords both guard against tiny files being called "subsets" (a lone header).
+export function classifyBlocks(A, B, { minBlocks = 3, minWords = 0, nearBlock = 0.8, relatedFraction = 0.3 } = {}) {
   if (A.length === B.length && A.every((x, i) => x === B[i])) return { v: "collapse" };
   const lcs = lcsLen(A, B);
   const aInB = lcs === A.length && A.length < B.length;
   const bInA = lcs === B.length && B.length < A.length;
   if (aInB || bInA) {
-    if (Math.min(A.length, B.length) < minBlocks) return { v: "separate" };
+    const small = aInB ? A : B;
+    if (small.length < minBlocks || small.join(" ").split(" ").length < minWords) return { v: "separate" };
     return { v: "collapse", subsetIsA: aInB };
   }
   const ca = counts(A);
   const cb = counts(B);
   const same = ca.size === cb.size && [...ca].every(([k, v]) => cb.get(k) === v);
-  if (same) return { v: "review", type: "reorder" };
+  if (same) return { v: "review", type: "reorder", shared: 1 };
   const shared = [...ca].reduce((s, [k, v]) => s + Math.min(v, cb.get(k) ?? 0), 0);
-  if (shared / Math.min(A.length, B.length) < relatedFraction) return { v: "separate" };
+  const sharedFraction = shared / Math.min(A.length, B.length);
+  if (sharedFraction < relatedFraction) return { v: "separate" };
   const aOnly = A.filter((x) => !cb.has(x));
   const bOnly = B.filter((x) => !ca.has(x));
   const contested = aOnly.some((x) => bOnly.some((y) => tokenJaccard(x, y) >= nearBlock));
-  return { v: "review", type: contested ? "conflict" : "additive" };
+  return { v: "review", type: contested ? "conflict" : "additive", shared: sharedFraction };
 }
 
-export function toolBlock(dir) {
-  const docs = readAll(dir).map((d) => ({ id: d.id, blocks: blocksOf(d.text) }));
+export function toolBlock(dir, { segment = paragraph, minWords = 0 } = {}) {
+  const docs = readAll(dir).map((d) => ({ id: d.id, blocks: segment(d.text) }));
   const index = new Map(); // block -> doc indexes (cheap candidate generation)
   docs.forEach((d, i) => new Set(d.blocks).forEach((b) => index.set(b, [...(index.get(b) ?? []), i])));
   const candidates = new Set();
@@ -120,11 +120,53 @@ export function toolBlock(dir) {
   const verdicts = new Map();
   for (const c of candidates) {
     const [i, j] = c.split("|").map(Number);
-    const r = classifyBlocks(docs[i].blocks, docs[j].blocks);
+    const r = classifyBlocks(docs[i].blocks, docs[j].blocks, { minWords });
     const v = { v: r.v };
     if (r.type) v.type = r.type;
     if (r.v === "collapse" && r.subsetIsA !== undefined) v.subset = r.subsetIsA ? docs[i].id : docs[j].id;
     verdicts.set(pairKey(docs[i].id, docs[j].id), v);
   }
   return { verdicts, comparisons: candidates.size };
+}
+
+/**
+ * Multi-segmentation: run the same exact classifier under several segmentations.
+ * - collapse if ANY segmentation exactly verifies identity/ordered containment (each check is exact on
+ *   its own units, so adding more segmentations can add recall but is not itself a similarity guess);
+ *   conflicting directions across segmentations => review instead.
+ * - otherwise review only if at least `agree` segmentations send the pair to review; type comes from
+ *   the review with the highest shared-unit fraction.
+ */
+export function toolMulti(dir, { segments, minWords = 60, agree = 2 } = {}) {
+  const docs = readAll(dir).map((d) => ({ id: d.id, units: segments.map((seg) => seg(d.text)) }));
+  const index = new Map();
+  docs.forEach((d, i) => d.units.forEach((u) => u.forEach((b) => (index.get(b) ?? index.set(b, new Set()).get(b)).add(i))));
+  const cand = new Set();
+  for (const set of index.values()) {
+    const list = [...set];
+    for (let x = 0; x < list.length; x++) for (let y = x + 1; y < list.length; y++) cand.add(`${list[x]}|${list[y]}`);
+  }
+  const verdicts = new Map();
+  for (const c of cand) {
+    const [i, j] = c.split("|").map(Number);
+    const rs = segments.map((_, k) => classifyBlocks(docs[i].units[k], docs[j].units[k], { minWords }));
+    const key = pairKey(docs[i].id, docs[j].id);
+    const collapses = rs.filter((r) => r.v === "collapse");
+    if (collapses.length) {
+      const dirs = new Set(collapses.filter((r) => r.subsetIsA !== undefined).map((r) => r.subsetIsA));
+      if (dirs.size > 1) verdicts.set(key, { v: "review" });
+      else {
+        const v = { v: "collapse" };
+        if (dirs.size === 1) v.subset = [...dirs][0] ? docs[i].id : docs[j].id;
+        verdicts.set(key, v);
+      }
+      continue;
+    }
+    const reviews = rs.filter((r) => r.v === "review");
+    if (reviews.length >= agree) {
+      const best = reviews.reduce((a, b) => (b.shared > a.shared ? b : a));
+      verdicts.set(key, { v: "review", type: best.type });
+    }
+  }
+  return { verdicts, comparisons: cand.size };
 }

@@ -57,3 +57,14 @@ test("block classifier: reorder never collapses, an edited block is a conflict",
   const r = classifyBlocks([long("alpha"), "x1", "x2", "x3"], [long("beta"), "x1", "x2", "x3"]);
   assert.equal(r.type, "conflict");
 });
+
+import { paragraph, paragraphWithLineFallback, sentence } from "../spike/segment.mjs";
+
+test("segmentation: wrap and CRLF do not change sentence units; line fallback rescues tight files", () => {
+  const text = "First sentence here. Second sentence here.\n\nThird one follows. Fourth one ends.\n";
+  const wrapped = "First sentence\r\nhere. Second sentence here.\r\n\r\nThird one follows.\r\nFourth one ends.\r\n";
+  assert.deepEqual(sentence(text), sentence(wrapped));
+  const tight = "alpha line one\nbeta line two\ngamma line three\n";
+  assert.equal(paragraph(tight).length, 1); // fragile: whole file is one unit
+  assert.equal(paragraphWithLineFallback(tight).length, 3);
+});
