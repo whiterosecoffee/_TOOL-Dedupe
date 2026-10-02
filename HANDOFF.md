@@ -79,11 +79,11 @@ This merges the previous session's "similarity pre-filter" item with plan items 
 - unmet because: an OneDrive file lock blocked deletion (previous session's report); the directory still existed on 2026-10-01.
 - clears when: the lock releases (often after a reboot) and someone deletes it by hand.
 
-### 8. Preserve the SESSION HANDOFF protocol (ghost: lives outside this repo)
-- attest: the protocol (v3) exists as a real file, for example `SESSION-HANDOFF-PROTOCOL.md` in the Prompts repo next to `SESSION-CLOSING-PROTOCOL.md`.
-- lives: Prompts repo root (outside this session's folders).
-- unmet because: the protocol exists only as chat text in the previous session, and writing it to the Prompts repo was not approved here. Maturity: the v3 text is not available in this session, only its resulting manifest.
-- clears when: the owner has the previous session (or a new one) write it to the Prompts repo in an isolated worktree, or supplies the v3 text.
+### 8. Preserve the SESSION HANDOFF protocol (partly cleared; remainder is a ghost outside this repo)
+- attest: the protocol (v3) exists as a real file. MET in this repo: `SESSION-HANDOFF-PROTOCOL.md` (text received 2026-10-01 from the originating session, saved as received). NOT YET MET: a copy next to `SESSION-CLOSING-PROTOCOL.md` in the Prompts repo, if the owner wants it there.
+- lives: this repo (done) and, optionally, the Prompts repo root (outside this session's folders).
+- unmet because: the originating session did not say whether the text is exactly what it ran or a reconstruction, and the text contains no "standing concurrency check" even though that session's summary said v3 added one. Writing to the Prompts repo was not approved here.
+- clears when: the owner decides whether to copy it into the Prompts repo (and, if so, does it in an isolated worktree), and either confirms the text is complete or adds the missing concurrency check as a v4.
 
 ## Known unverified claims
 Everything about the Prompts repo above (deleted branches, `dd05a89f`, `585623bf`, branch contents). A fresh session should re-check with `git log` there before relying on it.
