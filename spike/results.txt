@@ -1,0 +1,47 @@
+Seeds: 5, families/seed: 8, documents: 310, labelled pairs: 9474
+Truth mix: identical=262, reorder=115, subset=385, conflict=163, unrelated=8122, trivial=352, additive=75
+
+| tool | unsafe merges | safe-collapse recall | conflicts etc. surfaced | hidden by collapse | review band | false review | typed triage | comparisons |
+|---|---|---|---|---|---|---|---|---|
+| v0 (old, as shipped) | 0 | 46% (300/647) | 55% (195/353) | 0 | 322 | 5 | untyped | 9474 |
+| v0 + --normalize | 0 | 70% (456/647) | 43% (152/353) | 0 | 204 | 5 | untyped | 9474 |
+| similarity-decides (ablation) | 329 | 100% (645/647) | 59% (210/353) | 143 | 211 | 0 | untyped | 9474 |
+| block-level + exact verify | 0 | 76% (490/647) | 89% (315/353) | 0 | 328 | 13 | 100% | 3620 |
+
+Verdict by true relationship (collapse / review / separate):
+
+v0 (old, as shipped)
+  identical  77 / 30 / 155
+  reorder    0 / 51 / 64
+  subset     223 / 92 / 70
+  conflict   0 / 90 / 73
+  unrelated  0 / 0 / 8122
+  trivial    0 / 5 / 347
+  additive   0 / 54 / 21
+
+v0 + --normalize
+  identical  160 / 3 / 99
+  reorder    0 / 26 / 89
+  subset     296 / 44 / 45
+  conflict   0 / 72 / 91
+  unrelated  0 / 0 / 8122
+  trivial    0 / 5 / 347
+  additive   0 / 54 / 21
+
+similarity-decides (ablation)
+  identical  262 / 0 / 0
+  reorder    0 / 115 / 0
+  subset     383 / 1 / 1
+  conflict   143 / 20 / 0
+  unrelated  0 / 0 / 8122
+  trivial    186 / 0 / 166
+  additive   0 / 75 / 0
+
+block-level + exact verify
+  identical  165 / 0 / 97
+  reorder    0 / 95 / 20
+  subset     325 / 0 / 60
+  conflict   0 / 145 / 18
+  unrelated  0 / 13 / 8109
+  trivial    0 / 0 / 352
+  additive   0 / 75 / 0
